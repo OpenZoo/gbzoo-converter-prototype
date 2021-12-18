@@ -7,6 +7,8 @@ import java.util.List;
 
 @Data
 public abstract class OopCommand implements ChildrenIterable<OopCommand> {
+	private Integer position;
+
 	public List<OopCommand> getChildren() {
 		return List.of();
 	}

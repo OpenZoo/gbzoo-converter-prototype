@@ -354,10 +354,13 @@ public class OopProgramParser {
 				}
 			} else if (oopChar == '/' || oopChar == '?') {
 				OopDirection direction = parseDirection();
-				program.commands.add(oopChar == '?' ? new OopCommandDirectionTry(direction) : new OopCommandDirection(direction));
+				OopCommand cmd = oopChar == '?' ? new OopCommandDirectionTry(direction) : new OopCommandDirection(direction);
+				cmd.setPosition(lastPosition);
+				program.commands.add(cmd);
 			} else if (oopChar == '#') {
 				OopCommand cmd = readCommand();
 				if (cmd != null) {
+					cmd.setPosition(lastPosition);
 					program.commands.add(cmd);
 				}
 
@@ -365,12 +368,18 @@ public class OopProgramParser {
 					skipLine();
 				}
 			} else if (oopChar == 13) {
-				program.commands.add(parseTextLine(""));
+				OopCommand cmd = parseTextLine("");
+				cmd.setPosition(lastPosition);
+				program.commands.add(cmd);
 			} else if (oopChar == 0) {
 				// TODO: Formally different from #END (doesn't change position), but does it matter?
-				program.commands.add(new OopCommandEnd());
+				OopCommand cmd = new OopCommandEnd();
+				cmd.setPosition(lastPosition);
+				program.commands.add(cmd);
 			} else {
-				program.commands.add(parseTextLine(Character.toString(oopChar) + readLineToEnd()));
+				OopCommand cmd = parseTextLine(Character.toString(oopChar) + readLineToEnd());
+				cmd.setPosition(lastPosition);
+				program.commands.add(cmd);
 			}
 		}
 	}

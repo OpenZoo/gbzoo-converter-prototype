@@ -1,5 +1,6 @@
 package pl.asie.gbzooconv;
 
+import lombok.AccessLevel;
 import lombok.Getter;
 import pl.asie.libzzt.Platform;
 import pl.asie.libzzt.oop.OopLabelTarget;
@@ -65,11 +66,13 @@ import pl.asie.libzzt.oop.directions.OopDirectionWest;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Getter
 public class GBZooOopBoardConverter {
@@ -94,11 +97,40 @@ public class GBZooOopBoardConverter {
 	private final Set<OopProgram> programs = new HashSet<>();
 	private final List<String> labels = new ArrayList<>(); // ordering sensitive
 	private final List<String> names = new ArrayList<>(); // ordering sensitive
+	@Getter(AccessLevel.PRIVATE)
+	private final Map<OopProgram, Map<Integer, Integer>> programPositionMap = new HashMap<>();
 	private final BankPacker packer;
+	private final boolean failFast;
 
-	public GBZooOopBoardConverter(GBZooOopWorldState worldState, BankPacker packer) {
+	public GBZooOopBoardConverter(GBZooOopWorldState worldState, BankPacker packer, boolean failFast) {
 		this.worldState = worldState;
 		this.packer = packer;
+		this.failFast = failFast;
+	}
+
+	public void warnOrError(String s) {
+		if (failFast) {
+			throw new RuntimeException(s);
+		} else {
+			System.err.println("WARNING: " + s);
+		}
+	}
+
+	public Integer convertProgramPositionToSerialized(OopProgram program, int position) {
+		if (position == -1) {
+			return -1;
+		} else if (position == 0) {
+			return 0;
+		} else if (programPositionMap.containsKey(program)) {
+			Map<Integer, Integer> positionMap = programPositionMap.get(program);
+			return positionMap.get(position);
+		} else {
+			return null;
+		}
+	}
+
+	public Map<Integer, Integer> getProgramPositions(OopProgram program) {
+		return programPositionMap.getOrDefault(program, Map.of());
 	}
 
 	private static <T> int indexOfOrThrow(List<T> list, T item) {
@@ -128,8 +160,6 @@ public class GBZooOopBoardConverter {
 			return;
 		}
 
-		System.out.println(program);
-
 		if (program.getName() != null && !program.getName().isEmpty() && !names.contains(program.getName())) {
 			names.add(program.getName());
 		}
@@ -141,6 +171,25 @@ public class GBZooOopBoardConverter {
 	private void serializeTile(OopTile tile, List<Integer> code) {
 		code.add(tile.getElement().getId());
 		code.add(tile.getColor());
+	}
+
+	private String isValidLabelTarget(OopLabelTarget target) {
+		List<String> errors = new ArrayList<>();
+		try {
+			indexOfOrThrow(names, SPECIAL_NAMES, target.getTarget());
+		} catch (RuntimeException e) {
+			errors.add(e.getMessage());
+		}
+		try {
+			indexOfOrThrow(labels, SPECIAL_LABELS, target.getLabel());
+		} catch (RuntimeException e) {
+			errors.add(e.getMessage());
+		}
+		if (errors.isEmpty()) {
+			return null;
+		} else {
+			return String.join(", ", errors);
+		}
 	}
 
 	private void serializeLabelTarget(OopLabelTarget target, List<Integer> code) {
@@ -295,8 +344,14 @@ public class GBZooOopBoardConverter {
 		} else if (command instanceof OopCommandUnlock) {
 			code.add(0x13);
 		} else if (command instanceof OopCommandSend cmd) {
-			code.add(0x14);
-			serializeLabelTarget(cmd.getTarget(), code);
+			String err = isValidLabelTarget(cmd.getTarget());
+			if (err != null) {
+				warnOrError(err);
+				code.add(0x0C);
+			} else {
+				code.add(0x14);
+				serializeLabelTarget(cmd.getTarget(), code);
+			}
 		} else if (command instanceof OopCommandBecome cmd) {
 			code.add(0x15);
 			serializeTile(cmd.getTile(), code);
@@ -346,6 +401,7 @@ public class GBZooOopBoardConverter {
 	}
 
 	public byte[] serializeProgram(OopProgram program) {
+		Map<Integer, Integer> positionMap = new HashMap<>();
 		List<Integer> code = new ArrayList<>();
 		List<Integer> labels = new ArrayList<>();
 		List<BankPacker.PointerUpdateRequest> ptrRequests = new ArrayList<>();
@@ -386,6 +442,9 @@ public class GBZooOopBoardConverter {
 		// Serialization
 		OopCommand lastCmd = null;
 		for (OopCommand cmd : commands) {
+			if (cmd.getPosition() != null) {
+				positionMap.put(cmd.getPosition(), code.size());
+			}
 			serializeCommand(cmd, code, labels, ptrRequests);
 			lastCmd = cmd;
 		}
@@ -446,6 +505,7 @@ public class GBZooOopBoardConverter {
 			this.packer.updatePointer(request);
 		}
 
+		programPositionMap.put(program, positionMap);
 		return fullDataByte;
 	}
 

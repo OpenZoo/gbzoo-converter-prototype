@@ -152,7 +152,7 @@ public class GBZooConverter {
 
 			stream.writePByte(board.getStats().size() - 1);
 
-			GBZooOopBoardConverter oopConverter = new GBZooOopBoardConverter(oopWorldState, this.bankPacker);
+			GBZooOopBoardConverter oopConverter = new GBZooOopBoardConverter(oopWorldState, this.bankPacker, false);
 
 			for (Stat stat : board.getStats()) {
 				stat.copyStatToStatId(board);
@@ -194,11 +194,17 @@ public class GBZooConverter {
 				stream.writePByte(stat.getUnderColor());
 				int dataOfs = 0xFFFF;
 				boolean emitNewDataOfs = false;
-				if (stat.getBoundStat() != null) {
-					dataOfs = statToDataOfs.get(stat.getBoundStat());
-				} else if (stat.getCode() != null) {
-					dataOfs = dataOffsets.size();
-					emitNewDataOfs = true;
+				if (stat.getCode() != null) {
+					if (stat.getBoundStat() != null) {
+						Stat boundStat = stat.getBoundStat();
+						while (boundStat.getBoundStat() != null) {
+							boundStat = boundStat.getBoundStat();
+						}
+						dataOfs = statToDataOfs.get(boundStat);
+					} else {
+						dataOfs = dataOffsets.size();
+						emitNewDataOfs = true;
+					}
 				}
 				stream.writePShort(dataOfs);
 				int dataPos;
@@ -207,7 +213,12 @@ public class GBZooConverter {
 				} else if (stat.getDataPos() == 0) {
 					dataPos = 0;
 				} else if (stat.getCode() != null) {
-					throw new RuntimeException("Unsupported data position: " + stat.getDataPos());
+					Integer newDataPos = oopConverter.convertProgramPositionToSerialized(stat.getCode(), stat.getDataPos());
+					if (newDataPos != null) {
+						dataPos = newDataPos;
+					} else {
+						throw new RuntimeException("Unsupported data position: " + stat.getDataPos() + " (stat index " + board.getStatId(stat) + ", positions: " + oopConverter.getProgramPositions(stat.getCode()) + ")");
+					}
 				} else {
 					dataPos = stat.getDataPos(); // ditto
 				}
@@ -243,6 +254,7 @@ public class GBZooConverter {
 						throw new RuntimeException("Too big data offset size: " + dataOffsetsSize);
 					}
 					dataOffsets.set(dataOffsetsPos + 3, dataOffsetsSize);
+					statToDataOfs.put(stat, dataOffsetsPos);
 				}
 			}
 
