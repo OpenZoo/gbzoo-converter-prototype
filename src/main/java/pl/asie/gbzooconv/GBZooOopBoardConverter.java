@@ -13,14 +13,17 @@ import pl.asie.libzzt.oop.commands.OopCommandBind;
 import pl.asie.libzzt.oop.commands.OopCommandChange;
 import pl.asie.libzzt.oop.commands.OopCommandChar;
 import pl.asie.libzzt.oop.commands.OopCommandClear;
+import pl.asie.libzzt.oop.commands.OopCommandComment;
 import pl.asie.libzzt.oop.commands.OopCommandCycle;
 import pl.asie.libzzt.oop.commands.OopCommandDie;
 import pl.asie.libzzt.oop.commands.OopCommandDirection;
 import pl.asie.libzzt.oop.commands.OopCommandDirectionTry;
 import pl.asie.libzzt.oop.commands.OopCommandEnd;
 import pl.asie.libzzt.oop.commands.OopCommandEndgame;
+import pl.asie.libzzt.oop.commands.OopCommandGive;
 import pl.asie.libzzt.oop.commands.OopCommandGo;
 import pl.asie.libzzt.oop.commands.OopCommandIdle;
+import pl.asie.libzzt.oop.commands.OopCommandIf;
 import pl.asie.libzzt.oop.commands.OopCommandLabel;
 import pl.asie.libzzt.oop.commands.OopCommandLock;
 import pl.asie.libzzt.oop.commands.OopCommandPlay;
@@ -30,11 +33,20 @@ import pl.asie.libzzt.oop.commands.OopCommandRestore;
 import pl.asie.libzzt.oop.commands.OopCommandSend;
 import pl.asie.libzzt.oop.commands.OopCommandSet;
 import pl.asie.libzzt.oop.commands.OopCommandShoot;
+import pl.asie.libzzt.oop.commands.OopCommandTextLine;
 import pl.asie.libzzt.oop.commands.OopCommandThrowstar;
 import pl.asie.libzzt.oop.commands.OopCommandTry;
 import pl.asie.libzzt.oop.commands.OopCommandUnlock;
 import pl.asie.libzzt.oop.commands.OopCommandWalk;
 import pl.asie.libzzt.oop.commands.OopCommandZap;
+import pl.asie.libzzt.oop.conditions.OopCondition;
+import pl.asie.libzzt.oop.conditions.OopConditionAlligned;
+import pl.asie.libzzt.oop.conditions.OopConditionAny;
+import pl.asie.libzzt.oop.conditions.OopConditionBlocked;
+import pl.asie.libzzt.oop.conditions.OopConditionContact;
+import pl.asie.libzzt.oop.conditions.OopConditionEnergized;
+import pl.asie.libzzt.oop.conditions.OopConditionFlag;
+import pl.asie.libzzt.oop.conditions.OopConditionNot;
 import pl.asie.libzzt.oop.directions.OopDirection;
 import pl.asie.libzzt.oop.directions.OopDirectionCcw;
 import pl.asie.libzzt.oop.directions.OopDirectionCw;
@@ -75,14 +87,17 @@ public class GBZooOopBoardConverter {
 	);
 	private static final int MAX_LABELS = 255 - SPECIAL_LABELS.size();
 	private static final int MAX_NAMES = 255 - SPECIAL_NAMES.size();
+	private static final int CODE_OFFSET = 5;
 
 	private final GBZooOopWorldState worldState;
 	private final Set<OopProgram> programs = new HashSet<>();
 	private final List<String> labels = new ArrayList<>(); // ordering sensitive
 	private final List<String> names = new ArrayList<>(); // ordering sensitive
+	private final BankPacker packer;
 
-	public GBZooOopBoardConverter(GBZooOopWorldState worldState) {
+	public GBZooOopBoardConverter(GBZooOopWorldState worldState, BankPacker packer) {
 		this.worldState = worldState;
+		this.packer = packer;
 	}
 
 	private static <T> int indexOfOrThrow(List<T> list, T item) {
@@ -94,6 +109,9 @@ public class GBZooOopBoardConverter {
 	}
 
 	private static <T> int indexOfOrThrow(List<T> list, Map<T, Integer> specialMap, T item) {
+		if (item == null || ((item instanceof String) && ((String) item).isEmpty())) {
+			return 255;
+		}
 		if (specialMap.containsKey(item)) {
 			return specialMap.get(item);
 		}
@@ -127,6 +145,30 @@ public class GBZooOopBoardConverter {
 	private void serializeLabelTarget(OopLabelTarget target, List<Integer> code) {
 		code.add(indexOfOrThrow(names, SPECIAL_NAMES, target.getTarget()));
 		code.add(indexOfOrThrow(labels, SPECIAL_LABELS, target.getLabel()));
+	}
+
+	private void serializeCondition(OopCondition condition, List<Integer> code) {
+		if (condition instanceof OopConditionNot cond) {
+			code.add(0x00);
+			serializeCondition(cond.getCond(), code);
+		} else if (condition instanceof OopConditionAlligned) {
+			code.add(0x01);
+		} else if (condition instanceof OopConditionContact) {
+			code.add(0x02);
+		} else if (condition instanceof OopConditionBlocked cond) {
+			code.add(0x03);
+			serializeDirection(cond.getDirection(), code);
+		} else if (condition instanceof OopConditionEnergized) {
+			code.add(0x04);
+		} else if (condition instanceof OopConditionAny cond) {
+			code.add(0x05);
+			serializeTile(cond.getTile(), code);
+		} else if (condition instanceof OopConditionFlag cond) {
+			code.add(0x06);
+			code.add(indexOfOrThrow(worldState.getFlags(), cond.getFlag()));
+		} else {
+			throw new RuntimeException("Unsupported condition: " + condition);
+		}
 	}
 
 	private void serializeDirection(OopDirection direction, List<Integer> code) {
@@ -167,8 +209,22 @@ public class GBZooOopBoardConverter {
 		}
 	}
 
-	private void serializeCommand(OopCommand command, List<Integer> code, List<Integer> labels) {
+	private void serializeSkippableCommand(OopCommand command, List<Integer> code, List<BankPacker.PointerUpdateRequest> ptrRequests) {
+		if (command == null) {
+			code.add(0);
+			return;
+		}
+
+		List<Integer> cmdCode = new ArrayList<>();
+		serializeCommand(command, cmdCode, null, ptrRequests);
+		code.add(cmdCode.size());
+		code.addAll(cmdCode);
+	}
+
+	private void serializeCommand(OopCommand command, List<Integer> code, List<Integer> labels, List<BankPacker.PointerUpdateRequest> ptrRequests) {
+		boolean isInner = labels == null;
 		if (command instanceof OopCommandLabel label) {
+			if (isInner) throw new RuntimeException("Not allowed inside a command!");
 			labels.add(indexOfOrThrow(this.labels, SPECIAL_LABELS, label.getLabel().toUpperCase(Locale.ROOT)));
 			int pos = code.size();
 			labels.add(pos & 0xFF);
@@ -184,6 +240,10 @@ public class GBZooOopBoardConverter {
 		} else if (command instanceof OopCommandGo cmd) {
 			code.add(0x03);
 			serializeDirection(cmd.getDirection(), code);
+		} else if (command instanceof OopCommandTry cmd) {
+			code.add(0x04);
+			serializeDirection(cmd.getDirection(), code);
+			serializeSkippableCommand(cmd.getElseCommand(), code, ptrRequests);
 		} else if (command instanceof OopCommandWalk cmd) {
 			code.add(0x05);
 			serializeDirection(cmd.getDirection(), code);
@@ -193,12 +253,30 @@ public class GBZooOopBoardConverter {
 		} else if (command instanceof OopCommandClear cmd) {
 			code.add(0x07);
 			code.add(indexOfOrThrow(worldState.getFlags(), cmd.getFlag()));
+		} else if (command instanceof OopCommandIf cmd) {
+			code.add(0x08);
+			serializeCondition(cmd.getCondition(), code);
+			serializeSkippableCommand(cmd.getElseCommand(), code, ptrRequests);
 		} else if (command instanceof OopCommandShoot cmd) {
 			code.add(0x09);
 			serializeDirection(cmd.getDirection(), code);
 		} else if (command instanceof OopCommandThrowstar cmd) {
 			code.add(0x0A);
 			serializeDirection(cmd.getDirection(), code);
+		} else if (command instanceof OopCommandGive cmd) {
+			code.add(0x0B);
+			switch (cmd.getCounterType()) {
+				case HEALTH -> code.add(0x00);
+				case AMMO -> code.add(0x01);
+				case GEMS -> code.add(0x02);
+				case TORCHES -> code.add(0x03);
+				case SCORE -> code.add(0x04);
+				case TIME -> code.add(0x05);
+				default -> throw new RuntimeException("Unsupported counter type: " + cmd.getCounterType());
+			}
+			code.add(cmd.getAmount() & 0xFF);
+			code.add((cmd.getAmount() >> 8) & 0xFF);
+			serializeSkippableCommand(cmd.getElseCommand(), code, ptrRequests);
 		} else if (command instanceof OopCommandEndgame) {
 			code.add(0x0D);
 		} else if (command instanceof OopCommandIdle) {
@@ -248,6 +326,19 @@ public class GBZooOopBoardConverter {
 		} else if (command instanceof OopCommandBind cmd) {
 			code.add(0x1C);
 			code.add(indexOfOrThrow(names, SPECIAL_NAMES, cmd.getTargetName()));
+		} else if (command instanceof OopCommandGBZWrappedTextLines cmd) {
+			code.add(0x1D);
+			code.add(cmd.getLineCount());
+			code.add(cmd.getLines().size());
+
+			for (OopCommandTextLine line : cmd.getLines()) {
+				int labelId = indexOfOrThrow(this.labels, SPECIAL_LABELS, line.getDestination() != null ? line.getDestination().toUpperCase(Locale.ROOT) : line.getDestination());
+				byte[] textLine = worldState.addTextLine(line, labelId);
+				ptrRequests.add(new BankPacker.PointerUpdateRequest(true, textLine, null, CODE_OFFSET + code.size()));
+				code.add(0);
+				code.add(0);
+				code.add(0);
+			}
 		} else {
 			throw new RuntimeException("Unsupported command: " + command);
 		}
@@ -256,23 +347,71 @@ public class GBZooOopBoardConverter {
 	public byte[] serializeProgram(OopProgram program) {
 		List<Integer> code = new ArrayList<>();
 		List<Integer> labels = new ArrayList<>();
-		byte[] windowName = program.getWindowName().getBytes(StandardCharsets.ISO_8859_1);
+		List<BankPacker.PointerUpdateRequest> ptrRequests = new ArrayList<>();
+		byte[] windowName = program.getWindowName() != null ? program.getWindowName().getBytes(StandardCharsets.ISO_8859_1) : new byte[0];
 
+		List<OopCommand> commands = new ArrayList<>(program.getCommands().size());
+		List<OopCommandTextLine> textLines = new ArrayList<>();
 		for (OopCommand cmd : program.getCommands()) {
-			serializeCommand(cmd, code, labels);
+			if (cmd instanceof OopCommandComment) {
+				continue;
+			}
+
+			if (cmd instanceof OopCommandCycle c) {
+				if (c.getValue() <= 0) {
+					continue;
+				}
+			} else if (cmd instanceof OopCommandChar c) {
+				if (c.getValue() <= 0 || c.getValue() > 255) {
+					continue;
+				}
+			}
+
+			if (cmd instanceof OopCommandTextLine tl) {
+				textLines.add(tl);
+			} else {
+				if (!textLines.isEmpty()) {
+					commands.add(new OopCommandGBZWrappedTextLines(textLines, 20));
+					textLines.clear();
+				}
+				commands.add(cmd);
+			}
 		}
+		if (!textLines.isEmpty()) {
+			commands.add(new OopCommandGBZWrappedTextLines(textLines, 20));
+			textLines.clear();
+		}
+
+		// Serialization
+		OopCommand lastCmd = null;
+		for (OopCommand cmd : commands) {
+			serializeCommand(cmd, code, labels, ptrRequests);
+			lastCmd = cmd;
+		}
+		if (!(lastCmd instanceof OopCommandEnd)) {
+			serializeCommand(new OopCommandEnd(), code, labels, ptrRequests);
+		}
+
+		// Statistics
+		int linesInProgram = 0;
+		for (OopCommand cmd : commands) {
+			if (cmd instanceof OopCommandGBZWrappedTextLines tl) {
+				linesInProgram += tl.getLines().size();
+			}
+		}
+		this.worldState.setMaxLinesInProgram(linesInProgram);
 
 		List<Integer> fullData = new ArrayList<>();
 		int idx = names.indexOf(program.getName());
 		fullData.add(idx >= 0 ? idx : 255);
 		int offsetToWindowName = 0;
 		if (windowName.length > 0) {
-			offsetToWindowName = code.size() + 2;
+			offsetToWindowName = code.size() + 5;
 		}
 		int offsetToLabelList = 0;
 		if (!labels.isEmpty()) {
 			if (windowName.length > 0) {
-				offsetToLabelList = code.size() + 1 + windowName.length;
+				offsetToLabelList = code.size() + 6 + windowName.length;
 			}
 		} else {
 			offsetToLabelList = code.size();
@@ -289,13 +428,23 @@ public class GBZooOopBoardConverter {
 			}
 		}
 		if (!labels.isEmpty()) {
+			int labelCount = labels.size() / 3;
+			if (labelCount >= 256) {
+				throw new RuntimeException("Maximum of 255 labels per stat supported!");
+			}
+			fullData.add(labelCount);
 			fullData.addAll(labels);
 		}
 
-		byte[] fullDataByte = new byte[fullData.size()];
-		for (int i = 0; i < fullData.size(); i++) {
-			fullDataByte[i] = (byte) ((int) fullData.get(i));
+		byte[] fullDataByte = GBZooUtils.toByteArray(fullData);
+
+		for (BankPacker.PointerUpdateRequest request : ptrRequests) {
+			if (request.getPtrArray() == null) {
+				request = request.withPtrArray(fullDataByte);
+			}
+			this.packer.updatePointer(request);
 		}
+
 		return fullDataByte;
 	}
 

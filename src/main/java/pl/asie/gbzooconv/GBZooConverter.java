@@ -8,11 +8,16 @@ import pl.asie.libzzt.World;
 import pl.asie.libzzt.ZOutputStream;
 import pl.asie.libzzt.oop.OopParseException;
 import pl.asie.libzzt.oop.OopProgram;
+import pl.asie.libzzt.oop.commands.OopCommand;
+import pl.asie.libzzt.oop.commands.OopCommandLabel;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -38,7 +43,7 @@ public class GBZooConverter {
 	}
 
 	public void addWorld(World world) throws IOException {
-		GBZooOopWorldState oopWorldState = new GBZooOopWorldState(world);
+		GBZooOopWorldState oopWorldState = new GBZooOopWorldState(world, this.bankPacker);
 
 		byte[] worldHeader = writeWorld(world);
 		this.boardPointers = new byte[getPointerArraySize(world.getBoards().size())];
@@ -51,10 +56,12 @@ public class GBZooConverter {
 		// write boards
 		for (int i = 0; i < world.getBoards().size(); i++) {
 			Board board = world.getBoards().get(i);
-			byte[] data = writeBoard(board, oopWorldState);
-			this.bankPacker.add(List.of(data));
+			byte[] data = addBoard(board, oopWorldState);
 			this.bankPacker.updatePointer(this.boardPointers, i * 3, data, true);
 		}
+
+		System.out.println("Max data offset size: " + oopWorldState.getMaxDataOffsetSize());
+		System.out.println("Max lines in program: " + oopWorldState.getMaxLinesInProgram());
 	}
 
 	public void write(OutputStream stream) throws IOException {
@@ -100,7 +107,9 @@ public class GBZooConverter {
 		}
 	}
 
-	private byte[] writeBoard(Board board, GBZooOopWorldState oopWorldState) throws IOException {
+	private byte[] addBoard(Board board, GBZooOopWorldState oopWorldState) throws IOException {
+		System.out.println("Saving board " + board.getName());
+
 		try (ByteArrayOutputStream byteStream = new ByteArrayOutputStream(); ZOutputStream stream = new ZOutputStream(byteStream, Platform.ZZT)) {
 			// fancy RLE logic
 			int ix = 1;
@@ -143,7 +152,7 @@ public class GBZooConverter {
 
 			stream.writePByte(board.getStats().size() - 1);
 
-			GBZooOopBoardConverter oopConverter = new GBZooOopBoardConverter(oopWorldState);
+			GBZooOopBoardConverter oopConverter = new GBZooOopBoardConverter(oopWorldState, this.bankPacker);
 
 			for (Stat stat : board.getStats()) {
 				stat.copyStatToStatId(board);
@@ -166,8 +175,11 @@ public class GBZooConverter {
 
 			System.out.println(oopConverter.getLabels() + " " + oopConverter.getNames());
 
+			Map<Stat, Integer> statToDataOfs = new IdentityHashMap<>();
+			List<Integer> dataOffsets = new ArrayList<>();
+			List<BankPacker.PointerUpdateRequest> dataPtrRequests = new ArrayList<>();
+
 			for (Stat stat : board.getStats()) {
-				// TODO: handle data
 				stream.writePByte(stat.getX());
 				stream.writePByte(stat.getY());
 				stream.writePByte(stat.getStepX());
@@ -180,20 +192,78 @@ public class GBZooConverter {
 				stream.writePByte(fixCentipedeStatId(stat.getLeader()));
 				stream.writePByte(stat.getUnderElement() != null ? stat.getUnderElement().getId() : 0);
 				stream.writePByte(stat.getUnderColor());
-				int dataOfs = 0;
+				int dataOfs = 0xFFFF;
+				boolean emitNewDataOfs = false;
+				if (stat.getBoundStat() != null) {
+					dataOfs = statToDataOfs.get(stat.getBoundStat());
+				} else if (stat.getCode() != null) {
+					dataOfs = dataOffsets.size();
+					emitNewDataOfs = true;
+				}
 				stream.writePShort(dataOfs);
 				int dataPos;
 				if (stat.getDataPos() < 0) {
 					dataPos = -1;
 				} else if (stat.getDataPos() == 0) {
 					dataPos = 0;
-				} else {
+				} else if (stat.getCode() != null) {
 					throw new RuntimeException("Unsupported data position: " + stat.getDataPos());
+				} else {
+					dataPos = stat.getDataPos(); // ditto
 				}
 				stream.writePShort(dataPos);
+
+				if (emitNewDataOfs) {
+					dataPtrRequests.add(new BankPacker.PointerUpdateRequest(true, programMap.get(stat.getCode()), null, dataOfs));
+					int dataOffsetsPos = dataOffsets.size();
+					dataOffsets.add(0); // ptr request
+					dataOffsets.add(0);
+					dataOffsets.add(0);
+					dataOffsets.add(0); // obj flags/size
+					// zapped flags
+					int flagVals = 0;
+					int i = 0;
+					for (OopCommand command : stat.getCode().getCommands()) {
+						if (command instanceof OopCommandLabel lbl) {
+							if (lbl.isZapped()) {
+								flagVals |= 1 << (i & 7);
+							}
+							i++;
+							if ((i & 7) == 0) {
+								dataOffsets.add(flagVals);
+								flagVals = 0;
+							}
+						}
+					}
+					if ((i & 7) != 0) {
+						dataOffsets.add(flagVals);
+					}
+					int dataOffsetsSize = dataOffsets.size() - dataOffsetsPos;
+					if (dataOffsetsSize >= 128) {
+						throw new RuntimeException("Too big data offset size: " + dataOffsetsSize);
+					}
+					dataOffsets.set(dataOffsetsPos + 3, dataOffsetsSize);
+				}
 			}
 
-			return byteStream.toByteArray();
+			oopWorldState.setMaxDataOffsetSize(dataOffsets.size());
+			stream.writePShort(dataOffsets.size());
+			int dataOffsetsPos = byteStream.size();
+			for (Integer dataOfsByte : dataOffsets) {
+				stream.writePByte(dataOfsByte);
+			}
+
+			byte[] arr = byteStream.toByteArray();
+			this.bankPacker.add(List.of(arr));
+			for (BankPacker.PointerUpdateRequest request : dataPtrRequests) {
+				if (request.getPtrArray() == null) {
+					request = request.withPtrArray(arr);
+				}
+				request = request.withPosition(request.getPosition() + dataOffsetsPos);
+				this.bankPacker.updatePointer(request);
+			}
+
+			return arr;
 		}
 	}
 }

@@ -1,6 +1,7 @@
 package pl.asie.gbzooconv;
 
 import lombok.Data;
+import lombok.With;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -14,7 +15,8 @@ public class BankPacker {
 	private static final int BANK_SIZE = 16384;
 
 	@Data
-	private static class PointerUpdateRequest {
+	@With
+	public static class PointerUpdateRequest {
 		private final boolean far;
 		private final byte[] array;
 		private final byte[] ptrArray;
@@ -43,10 +45,14 @@ public class BankPacker {
 		add(List.of(array));
 	}
 
+	public void updatePointer(PointerUpdateRequest request) {
+		this.pointerUpdateRequestByTargetArray.computeIfAbsent(request.getArray(), (k) -> new ArrayList<>())
+				.add(request);
+	}
+
 	public void updatePointer(byte[] pointerList, int position, byte[] arrayToPointTo, boolean far) {
 		PointerUpdateRequest request = new PointerUpdateRequest(far, arrayToPointTo, pointerList, position);
-		this.pointerUpdateRequestByTargetArray.computeIfAbsent(arrayToPointTo, (k) -> new ArrayList<>())
-				.add(request);
+		updatePointer(request);
 	}
 
 	public int getUsedSpace(List<byte[]> list) {

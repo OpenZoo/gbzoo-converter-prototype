@@ -5,6 +5,7 @@ import pl.asie.libzzt.Platform;
 import pl.asie.libzzt.World;
 import pl.asie.libzzt.ZInputStream;
 import pl.asie.libzzt.ZOutputStream;
+import pl.asie.libzzt.oop.OopSound;
 
 import java.io.File;
 import java.io.FileInputStream;
@@ -28,7 +29,7 @@ public class Main {
        }
 
         GBZooConverter converter = new GBZooConverter(4, 256, 1);
-        converter.addWorld(readWorld(new File("/home/asie/zeta/TOWN.ZZT")));
+        converter.addWorld(readWorld(new File("/home/asie/zzt_gbc/zzt/TOWN.ZZT")));
 
         // For now, only convert the starting board.
         try (FileOutputStream fos = new FileOutputStream(args[1])) {

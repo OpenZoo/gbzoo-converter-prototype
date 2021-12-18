@@ -315,6 +315,21 @@ public class OopProgramParser {
 		}
 	}
 
+	private OopCommandTextLine parseTextLine(String s) {
+		if (s.startsWith("$")) {
+			return new OopCommandTextLine(OopCommandTextLine.Type.CENTERED, null, s.substring(1));
+		} else if (s.startsWith("!")) {
+			String[] split = s.substring(1).split(";", 2);
+			if (split[0].startsWith("-")) {
+				return new OopCommandTextLine(OopCommandTextLine.Type.EXTERNAL_HYPERLINK, split[0].substring(1), split[1]);
+			} else {
+				return new OopCommandTextLine(OopCommandTextLine.Type.HYPERLINK, split[0], split[1]);
+			}
+		} else {
+			return new OopCommandTextLine(OopCommandTextLine.Type.REGULAR, null, s);
+		}
+	}
+
 	public void parse(OopProgram program, String data) throws OopParseException {
 		this.data = data;
 		this.position = 0;
@@ -351,12 +366,12 @@ public class OopProgramParser {
 					skipLine();
 				}
 			} else if (oopChar == 13) {
-				program.commands.add(new OopCommandTextLine(""));
+				program.commands.add(parseTextLine(""));
 			} else if (oopChar == 0) {
 				// TODO: Formally different from #END (doesn't change position), but does it matter?
 				program.commands.add(new OopCommandEnd());
 			} else {
-				program.commands.add(new OopCommandTextLine(Character.toString(oopChar) + readLineToEnd()));
+				program.commands.add(parseTextLine(Character.toString(oopChar) + readLineToEnd()));
 			}
 		}
 	}
