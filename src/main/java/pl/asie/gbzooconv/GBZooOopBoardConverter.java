@@ -74,6 +74,7 @@ import java.util.Set;
 @Getter
 public class GBZooOopBoardConverter {
 	private static final Map<String, Integer> SPECIAL_LABELS = Map.of(
+			"RESTART", 255,
 			"SHOT", 254,
 			"ENERGIZE", 253,
 			"THUD", 252,
@@ -85,7 +86,7 @@ public class GBZooOopBoardConverter {
 			"OTHERS", 253,
 			"SELF", 252
 	);
-	private static final int MAX_LABELS = 255 - SPECIAL_LABELS.size();
+	private static final int MAX_LABELS = 256 - SPECIAL_LABELS.size();
 	private static final int MAX_NAMES = 255 - SPECIAL_NAMES.size();
 	private static final int CODE_OFFSET = 5;
 

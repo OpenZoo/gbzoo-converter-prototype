@@ -310,7 +310,6 @@ public class OopProgramParser {
 			return new OopCommandBind(oopWord);
 		} else {
 			// TODO: This doesn't handle #TEXT right if TEXT doesn't lead to a valid target.
-			readWord();
 			return new OopCommandSend(new OopLabelTarget(oopWord));
 		}
 	}
