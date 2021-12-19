@@ -87,7 +87,8 @@ public class GBZooOopBoardConverter {
 	private static final Map<String, Integer> SPECIAL_NAMES = Map.of(
 			"ALL", 254,
 			"OTHERS", 253,
-			"SELF", 252
+			"SELF", 252,
+			"", 251
 	);
 	private static final int MAX_LABELS = 256 - SPECIAL_LABELS.size();
 	private static final int MAX_NAMES = 255 - SPECIAL_NAMES.size();
@@ -142,7 +143,8 @@ public class GBZooOopBoardConverter {
 	}
 
 	private static <T> int indexOfOrThrow(List<T> list, Map<T, Integer> specialMap, T item) {
-		if (item == null || ((item instanceof String) && ((String) item).isEmpty())) {
+		//noinspection SuspiciousMethodCalls
+		if (item == null || ((item instanceof String) && ((String) item).isEmpty() && !specialMap.containsKey(""))) {
 			return 255;
 		}
 		if (specialMap.containsKey(item)) {
@@ -281,7 +283,7 @@ public class GBZooOopBoardConverter {
 		if (command instanceof OopCommandLabel label) {
 			if (isInner) throw new RuntimeException("Not allowed inside a command!");
 			labels.add(indexOfOrThrow(this.labels, SPECIAL_LABELS, label.getLabel().toUpperCase(Locale.ROOT)));
-			int pos = code.size();
+			int pos = code.size() | (label.isRestoreFindStringVisible() ? 0x8000 : 0);
 			labels.add(pos & 0xFF);
 			labels.add(pos >> 8);
 		} else if (command instanceof OopCommandEnd) {
@@ -339,11 +341,23 @@ public class GBZooOopBoardConverter {
 		} else if (command instanceof OopCommandRestart) {
 			code.add(0x0F);
 		} else if (command instanceof OopCommandZap cmd) {
-			code.add(0x10);
-			serializeLabelTarget(cmd.getTarget(), code);
+			String err = isValidLabelTarget(cmd.getTarget());
+			if (err != null) {
+				warnOrError(err);
+				code.add(0x0C);
+			} else {
+				code.add(0x10);
+				serializeLabelTarget(cmd.getTarget(), code);
+			}
 		} else if (command instanceof OopCommandRestore cmd) {
-			code.add(0x11);
-			serializeLabelTarget(cmd.getTarget(), code);
+			String err = isValidLabelTarget(cmd.getTarget());
+			if (err != null) {
+				warnOrError(err);
+				code.add(0x0C);
+			} else {
+				code.add(0x11);
+				serializeLabelTarget(cmd.getTarget(), code);
+			}
 		} else if (command instanceof OopCommandLock) {
 			code.add(0x12);
 		} else if (command instanceof OopCommandUnlock) {
@@ -482,9 +496,9 @@ public class GBZooOopBoardConverter {
 		if (!labels.isEmpty()) {
 			if (windowName.length > 0) {
 				offsetToLabelList = code.size() + 6 + windowName.length;
+			} else {
+				offsetToLabelList = code.size() + 5;
 			}
-		} else {
-			offsetToLabelList = code.size();
 		}
 		fullData.add(offsetToWindowName & 0xFF);
 		fullData.add(offsetToWindowName >> 8);

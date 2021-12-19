@@ -10,6 +10,7 @@ import java.util.List;
 public class OopCommandLabel extends OopCommand {
 	private final String label;
 	private final boolean zapped;
+	private final boolean restoreFindStringVisible;
 
 	@Override
 	public List<String> getLabels() {

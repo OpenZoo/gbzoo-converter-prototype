@@ -346,11 +346,23 @@ public class OopProgramParser {
 					program.windowName = readLineToEnd();
 				}
 			} else if (oopChar == '\'' || oopChar == ':') {
+				boolean zapped = oopChar == '\'';
 				String s = readLineToEnd();
+				OopCommand cmd = null;
 				if (WORD_PATTERN.matcher(s).find() && !s.startsWith(":")) {
-					program.commands.add(new OopCommandLabel(s, oopChar == '\''));
-				} else if (oopChar == '\'') {
-					program.commands.add(new OopCommandComment(s));
+					boolean restoreFindStringVisible = false;
+					int lastPosition = position;
+					readChar();
+					oopChar = upCase(oopChar);
+					restoreFindStringVisible = !((oopChar >= 'A' && oopChar <= 'Z') || (oopChar == '_'));
+					position = lastPosition;
+					cmd = new OopCommandLabel(s, zapped, restoreFindStringVisible);
+				} else if (zapped) {
+					cmd = new OopCommandComment(s);
+				}
+				if (cmd != null) {
+					cmd.setPosition(lastPosition - 1); // Label jumps are off by one
+					program.commands.add(cmd);
 				}
 			} else if (oopChar == '/' || oopChar == '?') {
 				OopDirection direction = parseDirection();

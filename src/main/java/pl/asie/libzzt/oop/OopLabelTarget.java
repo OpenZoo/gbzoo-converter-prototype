@@ -9,7 +9,7 @@ public class OopLabelTarget {
 
 	public OopLabelTarget(String labelTarget) {
 		if (labelTarget.indexOf(':') <= 0) {
-			target = "SELF";
+			target = "";
 			label = labelTarget;
 		} else {
 			String[] splits = labelTarget.split(":", 2);
