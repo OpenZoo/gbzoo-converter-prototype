@@ -20,6 +20,9 @@ public class OopCommandGBZWrappedTextLines extends OopCommand {
 	public OopCommandGBZWrappedTextLines(List<OopCommandTextLine> originalLines, int wordWrapWidth) {
 		this.lines = new ArrayList<>();
 		this.lineCount = originalLines.size();
+		if (originalLines.size() == 1 && originalLines.get(0).getMessage().isEmpty() && originalLines.get(0).getType() == OopCommandTextLine.Type.REGULAR) {
+			this.lineCount = 0;
+		}
 
 		List<OopCommandTextLine> lineBuffer = new ArrayList<>();
 		for (OopCommandTextLine line : originalLines) {

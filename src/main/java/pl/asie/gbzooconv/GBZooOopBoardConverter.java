@@ -449,7 +449,15 @@ public class GBZooOopBoardConverter {
 			}
 
 			if (cmd instanceof OopCommandTextLine tl) {
-				textLines.add(tl);
+				if (tl.getType() != OopCommandTextLine.Type.EXTERNAL_HYPERLINK) {
+					if (tl.getType() == OopCommandTextLine.Type.REGULAR && tl.getMessage().isEmpty()) {
+						commands.add(new OopCommandGBZWrappedTextLines(List.of(tl), 20));
+					} else {
+						textLines.add(tl);
+					}
+				} else {
+					warnOrError("External hyperlinks not supported!");
+				}
 			} else {
 				if (!textLines.isEmpty()) {
 					commands.add(new OopCommandGBZWrappedTextLines(textLines, 20));

@@ -29,7 +29,7 @@ public class Main {
        }
 
         GBZooConverter converter = new GBZooConverter(4, 256, 1);
-        converter.addWorld(readWorld(new File("/home/asie/zzt_gbc/zzt/DEMO2.ZZT")));
+        converter.addWorld(readWorld(new File("/home/asie/zzt_gbc/zzt/TOWN.ZZT")));
 
         // For now, only convert the starting board.
         try (FileOutputStream fos = new FileOutputStream(args[1])) {

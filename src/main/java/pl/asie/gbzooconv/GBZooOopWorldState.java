@@ -50,8 +50,8 @@ public class GBZooOopWorldState {
 
 		List<Integer> data = new ArrayList<>();
 		switch (line.getType()) {
-			case REGULAR -> data.add(0);
-			case CENTERED -> data.add(1);
+			case REGULAR -> { data.add(0); data.add(0); }
+			case CENTERED -> { data.add(1); data.add(0); }
 			case HYPERLINK -> { data.add(2); data.add(labelId); }
 			default -> throw new RuntimeException("Unsupported type: " + line.getType());
 		}

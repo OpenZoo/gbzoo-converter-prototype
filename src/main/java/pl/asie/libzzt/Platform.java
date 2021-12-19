@@ -2,6 +2,7 @@ package pl.asie.libzzt;
 
 import lombok.Builder;
 import lombok.Data;
+import lombok.With;
 
 @SuppressWarnings("ConstantConditions")
 @Data
