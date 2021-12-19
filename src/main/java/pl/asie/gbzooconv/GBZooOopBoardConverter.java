@@ -215,7 +215,12 @@ public class GBZooOopBoardConverter {
 			serializeTile(cond.getTile(), code);
 		} else if (condition instanceof OopConditionFlag cond) {
 			code.add(0x06);
-			code.add(indexOfOrThrow(worldState.getFlags(), cond.getFlag()));
+			int flagIdx = worldState.getFlags().indexOf(cond.getFlag());
+			if (flagIdx == -1) {
+				warnOrError("Flag " + cond.getFlag() + " not found in " + worldState.getFlags());
+				flagIdx = 255;
+			}
+			code.add(flagIdx);
 		} else {
 			throw new RuntimeException("Unsupported condition: " + condition);
 		}
@@ -388,7 +393,12 @@ public class GBZooOopBoardConverter {
 			code.add(cmd.getLines().size());
 
 			for (OopCommandTextLine line : cmd.getLines()) {
-				int labelId = indexOfOrThrow(this.labels, SPECIAL_LABELS, line.getDestination() != null ? line.getDestination().toUpperCase(Locale.ROOT) : line.getDestination());
+				int labelId = 255;
+				try {
+					labelId = indexOfOrThrow(this.labels, SPECIAL_LABELS, line.getDestination() != null ? line.getDestination().toUpperCase(Locale.ROOT) : line.getDestination());
+				} catch (Exception e) {
+					warnOrError(e.getMessage());
+				}
 				byte[] textLine = worldState.addTextLine(line, labelId);
 				ptrRequests.add(new BankPacker.PointerUpdateRequest(true, textLine, null, CODE_OFFSET + code.size()));
 				code.add(0);

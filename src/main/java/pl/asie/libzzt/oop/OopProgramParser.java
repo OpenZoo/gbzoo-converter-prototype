@@ -347,7 +347,7 @@ public class OopProgramParser {
 				}
 			} else if (oopChar == '\'' || oopChar == ':') {
 				String s = readLineToEnd();
-				if (WORD_PATTERN.matcher(s).find()) {
+				if (WORD_PATTERN.matcher(s).find() && !s.startsWith(":")) {
 					program.commands.add(new OopCommandLabel(s, oopChar == '\''));
 				} else if (oopChar == '\'') {
 					program.commands.add(new OopCommandComment(s));
