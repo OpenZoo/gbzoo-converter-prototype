@@ -6,10 +6,14 @@ import lombok.With;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
 
 public class BankPacker {
 	private static final int BANK_SIZE = 16384;
@@ -28,6 +32,7 @@ public class BankPacker {
 	private List<List<byte[]>> arrays;
 	private Map<Integer, List<byte[]>> bankData;
 	private Map<byte[], List<PointerUpdateRequest>> pointerUpdateRequestByTargetArray;
+	private Map<byte[], Boolean> arraysWrittenTo = new IdentityHashMap<>();
 
 	public BankPacker(int startingBank, int maxBanks) {
 		this.startingBank = startingBank;
@@ -48,6 +53,7 @@ public class BankPacker {
 	public void updatePointer(PointerUpdateRequest request) {
 		this.pointerUpdateRequestByTargetArray.computeIfAbsent(request.getArray(), (k) -> new ArrayList<>())
 				.add(request);
+		this.arraysWrittenTo.put(request.getPtrArray(), true);
 	}
 
 	public void updatePointer(byte[] pointerList, int position, byte[] arrayToPointTo, boolean far) {
@@ -67,14 +73,7 @@ public class BankPacker {
 		return BANK_SIZE - getUsedSpace(bank);
 	}
 
-	public void addToBank(int bank, byte[] array) {
-		int pos = getUsedSpace(bank);
-		List<byte[]> list = bankData.get(bank);
-		if (list == null) {
-			list = new ArrayList<>();
-			bankData.put(bank, list);
-		}
-		list.add(array);
+	private void writeUpdate(int bank, byte[] array, int pos) {
 		int nearPtr = pos + BANK_SIZE;
 		for (PointerUpdateRequest request : this.pointerUpdateRequestByTargetArray.getOrDefault(array, List.of())) {
 			request.ptrArray[request.position] = (byte) (nearPtr & 0xFF);
@@ -85,19 +84,50 @@ public class BankPacker {
 		}
 	}
 
+	public void addToBank(int bank, byte[] array) {
+		int pos = getUsedSpace(bank);
+		List<byte[]> list = bankData.get(bank);
+		if (list == null) {
+			list = new ArrayList<>();
+			bankData.put(bank, list);
+		}
+		list.add(array);
+		writeUpdate(bank, array, pos);
+	}
+
 	public void pack() {
 		arrays.sort(Comparator.comparingInt(a -> -getUsedSpace(a)));
 
 		for (List<byte[]> arrayList : arrays) {
 			int arraysLength = getUsedSpace(arrayList);
+			boolean written = false;
 
-			for (int i = startingBank; i < maxBanks; i++) {
-				if (getFreeSpace(i) >= arraysLength) {
-					addToBank(i, arrayList.get(0));
-					for (int j = 1; j < arrayList.size(); j++) {
-						addToBank(i, arrayList.get(j));
+			if (arrayList.size() == 1 && arrayList.stream().noneMatch(this.arraysWrittenTo::containsKey)) {
+				for (int i = startingBank; i < maxBanks; i++) {
+					if (!bankData.containsKey(i)) continue;
+					int j = 0;
+					for (byte[] array : bankData.get(i)) {
+						if (Arrays.equals(array, arrayList.get(0))) {
+							System.out.println("Re-using existing bank data - saved " + array.length + " bytes.");
+							writeUpdate(i, arrayList.get(0), j);
+							written = true;
+							break;
+						}
+						j += array.length;
 					}
-					break;
+					if (written) break;
+				}
+			}
+
+			if (!written) {
+				for (int i = startingBank; i < maxBanks; i++) {
+					if (getFreeSpace(i) >= arraysLength) {
+						addToBank(i, arrayList.get(0));
+						for (int j = 1; j < arrayList.size(); j++) {
+							addToBank(i, arrayList.get(j));
+						}
+						break;
+					}
 				}
 			}
 		}

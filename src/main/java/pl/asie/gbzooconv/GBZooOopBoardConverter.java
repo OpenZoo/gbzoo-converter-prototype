@@ -343,7 +343,7 @@ public class GBZooOopBoardConverter {
 		} else if (command instanceof OopCommandZap cmd) {
 			String err = isValidLabelTarget(cmd.getTarget());
 			if (err != null) {
-				warnOrError(err);
+				warnOrError("#ZAP: " + err);
 				code.add(0x0C);
 			} else {
 				code.add(0x10);
@@ -352,7 +352,7 @@ public class GBZooOopBoardConverter {
 		} else if (command instanceof OopCommandRestore cmd) {
 			String err = isValidLabelTarget(cmd.getTarget());
 			if (err != null) {
-				warnOrError(err);
+				warnOrError("#RESTORE: " + err);
 				code.add(0x0C);
 			} else {
 				code.add(0x11);
@@ -365,7 +365,7 @@ public class GBZooOopBoardConverter {
 		} else if (command instanceof OopCommandSend cmd) {
 			String err = isValidLabelTarget(cmd.getTarget());
 			if (err != null) {
-				warnOrError(err);
+				warnOrError("#SEND: " + err);
 				code.add(0x0C);
 			} else {
 				code.add(0x14);
@@ -399,8 +399,13 @@ public class GBZooOopBoardConverter {
 		} else if (command instanceof OopCommandDie) {
 			code.add(0x1B);
 		} else if (command instanceof OopCommandBind cmd) {
-			code.add(0x1C);
-			code.add(indexOfOrThrow(names, SPECIAL_NAMES, cmd.getTargetName()));
+			try {
+				int bindId = indexOfOrThrow(names, SPECIAL_NAMES, cmd.getTargetName());
+				code.add(0x1C);
+				code.add(bindId);
+			} catch (RuntimeException e) {
+				warnOrError("#BIND: " + e.getMessage());
+			}
 		} else if (command instanceof OopCommandGBZWrappedTextLines cmd) {
 			code.add(0x1D);
 			code.add(cmd.getLineCount());
