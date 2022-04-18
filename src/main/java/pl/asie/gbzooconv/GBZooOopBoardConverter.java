@@ -77,12 +77,12 @@ import java.util.stream.Collectors;
 @Getter
 public class GBZooOopBoardConverter {
 	private static final Map<String, Integer> SPECIAL_LABELS = Map.of(
-			"RESTART", 255,
-			"SHOT", 254,
-			"ENERGIZE", 253,
-			"THUD", 252,
-			"TOUCH", 251,
-			"BOMBED", 250
+			"RESTART", 254,
+			"SHOT", 253,
+			"ENERGIZE", 252,
+			"THUD", 251,
+			"TOUCH", 250,
+			"BOMBED", 249
 	);
 	private static final Map<String, Integer> SPECIAL_NAMES = Map.of(
 			"ALL", 254,
@@ -90,9 +90,10 @@ public class GBZooOopBoardConverter {
 			"SELF", 252,
 			"", 251
 	);
-	private static final int MAX_LABELS = 256 - SPECIAL_LABELS.size();
+	private static final int MAX_LABELS = 255 - SPECIAL_LABELS.size();
 	private static final int MAX_NAMES = 255 - SPECIAL_NAMES.size();
 	private static final int CODE_OFFSET = 5;
+	private static final int WORD_WRAP_WIDTH = 18;
 
 	private final GBZooOopWorldState worldState;
 	private final Set<OopProgram> programs = new HashSet<>();
@@ -412,13 +413,21 @@ public class GBZooOopBoardConverter {
 			code.add(cmd.getLines().size());
 
 			for (OopCommandTextLine line : cmd.getLines()) {
+				int targetId = 255;
 				int labelId = 255;
-				try {
-					labelId = indexOfOrThrow(this.labels, SPECIAL_LABELS, line.getDestination() != null ? line.getDestination().toUpperCase(Locale.ROOT) : line.getDestination());
-				} catch (Exception e) {
-					warnOrError(e.getMessage());
+				if (line.getType() == OopCommandTextLine.Type.HYPERLINK) {
+					try {
+						targetId = indexOfOrThrow(this.names, SPECIAL_NAMES, line.getDestination().getTarget().toUpperCase(Locale.ROOT));
+					} catch (Exception e) {
+						warnOrError("text line: " + e.getMessage());
+					}
+					try {
+						labelId = indexOfOrThrow(this.labels, SPECIAL_LABELS, line.getDestination().getLabel().toUpperCase(Locale.ROOT));
+					} catch (Exception e) {
+						warnOrError("text line: " + e.getMessage());
+					}
 				}
-				byte[] textLine = worldState.addTextLine(line, labelId);
+				byte[] textLine = worldState.addTextLine(line, targetId, labelId);
 				ptrRequests.add(new BankPacker.PointerUpdateRequest(true, textLine, null, CODE_OFFSET + code.size()));
 				code.add(0);
 				code.add(0);
@@ -455,24 +464,20 @@ public class GBZooOopBoardConverter {
 
 			if (cmd instanceof OopCommandTextLine tl) {
 				if (tl.getType() != OopCommandTextLine.Type.EXTERNAL_HYPERLINK) {
-					if (tl.getType() == OopCommandTextLine.Type.REGULAR && tl.getMessage().isEmpty()) {
-						commands.add(new OopCommandGBZWrappedTextLines(List.of(tl), 20));
-					} else {
-						textLines.add(tl);
-					}
+					textLines.add(tl);
 				} else {
 					warnOrError("External hyperlinks not supported!");
 				}
 			} else {
 				if (!textLines.isEmpty()) {
-					commands.add(new OopCommandGBZWrappedTextLines(textLines, 20));
+					commands.add(new OopCommandGBZWrappedTextLines(textLines, WORD_WRAP_WIDTH));
 					textLines.clear();
 				}
 				commands.add(cmd);
 			}
 		}
 		if (!textLines.isEmpty()) {
-			commands.add(new OopCommandGBZWrappedTextLines(textLines, 20));
+			commands.add(new OopCommandGBZWrappedTextLines(textLines, WORD_WRAP_WIDTH));
 			textLines.clear();
 		}
 

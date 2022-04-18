@@ -316,16 +316,16 @@ public class OopProgramParser {
 
 	private OopCommandTextLine parseTextLine(String s) {
 		if (s.startsWith("$")) {
-			return new OopCommandTextLine(OopCommandTextLine.Type.CENTERED, null, s.substring(1));
+			return new OopCommandTextLine(OopCommandTextLine.Type.CENTERED, null, null, s.substring(1));
 		} else if (s.startsWith("!")) {
 			String[] split = s.substring(1).split(";", 2);
 			if (split[0].startsWith("-")) {
-				return new OopCommandTextLine(OopCommandTextLine.Type.EXTERNAL_HYPERLINK, split[0].substring(1), split[1]);
+				return new OopCommandTextLine(OopCommandTextLine.Type.EXTERNAL_HYPERLINK, null, split[0].substring(1), split[1]);
 			} else {
-				return new OopCommandTextLine(OopCommandTextLine.Type.HYPERLINK, split[0], split[1]);
+				return new OopCommandTextLine(OopCommandTextLine.Type.HYPERLINK, new OopLabelTarget(split[0]), null, split[1]);
 			}
 		} else {
-			return new OopCommandTextLine(OopCommandTextLine.Type.REGULAR, null, s);
+			return new OopCommandTextLine(OopCommandTextLine.Type.REGULAR, null, null, s);
 		}
 	}
 

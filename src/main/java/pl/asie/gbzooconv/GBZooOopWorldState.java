@@ -23,6 +23,9 @@ public class GBZooOopWorldState {
 	private int maxLinesInProgram;
 
 	public GBZooOopWorldState(World world, BankPacker packer) {
+		world.getFlags().stream()
+				.filter(f -> !flags.contains(f))
+				.forEach(flags::add);
 		for (Board b : world.getBoards()) {
 			for (Stat stat : b.getStats()) {
 				if (stat.getData() != null) {
@@ -42,7 +45,7 @@ public class GBZooOopWorldState {
 		this.packer = packer;
 	}
 
-	public byte[] addTextLine(OopCommandTextLine line, int labelId) {
+	public byte[] addTextLine(OopCommandTextLine line, int targetId, int labelId) {
 		byte[] dataArray = textLineMap.get(line);
 		if (dataArray != null) {
 			return dataArray;
@@ -50,9 +53,9 @@ public class GBZooOopWorldState {
 
 		List<Integer> data = new ArrayList<>();
 		switch (line.getType()) {
-			case REGULAR -> { data.add(0); data.add(0); }
-			case CENTERED -> { data.add(1); data.add(0); }
-			case HYPERLINK -> { data.add(2); data.add(labelId); }
+			case REGULAR -> { data.add(0); data.add(0); data.add(0); }
+			case CENTERED -> { data.add(1); data.add(0); data.add(0); }
+			case HYPERLINK -> { data.add(2); data.add(targetId); data.add(labelId); }
 			default -> throw new RuntimeException("Unsupported type: " + line.getType());
 		}
 		byte[] lineText = line.getMessage().getBytes(StandardCharsets.ISO_8859_1);

@@ -3,6 +3,7 @@ package pl.asie.gbzooconv;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import org.davidmoten.text.utils.WordWrap;
+import pl.asie.libzzt.oop.OopLabelTarget;
 import pl.asie.libzzt.oop.commands.OopCommand;
 import pl.asie.libzzt.oop.commands.OopCommandTextLine;
 
@@ -27,7 +28,7 @@ public class OopCommandGBZWrappedTextLines extends OopCommand {
 		List<OopCommandTextLine> lineBuffer = new ArrayList<>();
 		for (OopCommandTextLine line : originalLines) {
 			// If the line is empty, make it stand alone.
-			if (line.getType() != OopCommandTextLine.Type.HYPERLINK && line.getMessage().isEmpty()) {
+			if (line.getType() != OopCommandTextLine.Type.HYPERLINK && line.getMessage().isBlank()) {
 				addLineBuffer(lineBuffer, wordWrapWidth);
 				lineBuffer.clear();
 				lineBuffer.add(line);
@@ -54,6 +55,10 @@ public class OopCommandGBZWrappedTextLines extends OopCommand {
 		if (!lineBuffer.isEmpty()) {
 			addLineBuffer(lineBuffer, wordWrapWidth);
 		}
+
+		/* for (OopCommandTextLine line : lines) {
+			System.out.println("appending '" + line.getMessage() + "'");
+		} */
 	}
 
 	private void addLineBuffer(List<OopCommandTextLine> buffer, int wordWrapWidth) {
@@ -70,17 +75,17 @@ public class OopCommandGBZWrappedTextLines extends OopCommand {
 		}
 
 		if (fullText.isBlank()) {
-			lines.add(createTextLine(currLine.getType(), currLine.getDestination(), "", wordWrapWidth));
+			lines.add(createTextLine(currLine.getType(), currLine.getDestination(), currLine.getExternalDestination(), "", wordWrapWidth));
 		} else {
 			try {
 				for (String s : WordWrap.from(fullText).maxWidth(wordWrapWidth).wrapToList()) {
-					lines.add(createTextLine(currLine.getType(), currLine.getDestination(), s, wordWrapWidth));
+					lines.add(createTextLine(currLine.getType(), currLine.getDestination(), currLine.getExternalDestination(), s, wordWrapWidth));
 				}
 			} catch (IllegalArgumentException e) {
 				fullText = buffer.stream().map(OopCommandTextLine::getMessage).map(String::strip).collect(Collectors.joining(" "));
 				try {
 					for (String s : WordWrap.from(fullText).maxWidth(wordWrapWidth).wrapToList()) {
-						lines.add(createTextLine(currLine.getType(), currLine.getDestination(), s, wordWrapWidth));
+						lines.add(createTextLine(currLine.getType(), currLine.getDestination(), currLine.getExternalDestination(), s, wordWrapWidth));
 					}
 				} catch (IllegalArgumentException ee) {
 					throw new RuntimeException(fullText, ee);
@@ -89,13 +94,13 @@ public class OopCommandGBZWrappedTextLines extends OopCommand {
 		}
 	}
 
-	private OopCommandTextLine createTextLine(OopCommandTextLine.Type type, String destination, String s, int wordWrapWidth) {
+	private OopCommandTextLine createTextLine(OopCommandTextLine.Type type, OopLabelTarget destination, String externalDestination, String s, int wordWrapWidth) {
 		if (type == OopCommandTextLine.Type.CENTERED) {
 			int offset = (wordWrapWidth - s.length()) / 2;
 			if (offset > 0) {
 				s = " ".repeat(offset) + s;
 			}
 		}
-		return new OopCommandTextLine(type, destination, s);
+		return new OopCommandTextLine(type, destination, externalDestination, s);
 	}
 }

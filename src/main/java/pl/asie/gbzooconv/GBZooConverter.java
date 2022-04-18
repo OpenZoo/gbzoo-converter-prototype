@@ -45,7 +45,7 @@ public class GBZooConverter {
 	public void addWorld(World world) throws IOException {
 		GBZooOopWorldState oopWorldState = new GBZooOopWorldState(world, this.bankPacker);
 
-		byte[] worldHeader = writeWorld(world);
+		byte[] worldHeader = writeWorld(oopWorldState, world);
 		this.boardPointers = new byte[getPointerArraySize(world.getBoards().size())];
 
 		this.bankPacker.add(List.of(worldHeader, this.boardPointers));
@@ -79,7 +79,7 @@ public class GBZooConverter {
 		}
 	}
 
-	private byte[] writeWorld(World world) throws IOException {
+	private byte[] writeWorld(GBZooOopWorldState worldState, World world) throws IOException {
 		try (ByteArrayOutputStream byteStream = new ByteArrayOutputStream(); ZOutputStream stream = new ZOutputStream(byteStream, Platform.ZZT)) {
 			stream.writePShort(world.getAmmo());
 			stream.writePShort(world.getGems());
@@ -96,9 +96,17 @@ public class GBZooConverter {
 			stream.writePByte(world.getCurrentBoard());
 			stream.writePByte(world.getTorchTicks());
 			stream.writePByte(world.getEnergizerTicks());
-			// TODO: Flags
 			for (int i = 0; i < 10; i++) {
-				stream.writePByte(255);
+				if (i >= world.getFlags().size()) {
+					stream.writePByte(255);
+				} else {
+					String flag = world.getFlags().get(i);
+					int flagIdx = worldState.getFlags().indexOf(flag);
+					if (flagIdx == -1) {
+						throw new RuntimeException("Flag " + flag + " not found in " + worldState.getFlags());
+					}
+					stream.writePByte(flagIdx);
+				}
 			}
 			stream.writePShort(world.getBoardTimeSec());
 			stream.writePShort(world.getBoardTimeHsec());
