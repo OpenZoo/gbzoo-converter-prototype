@@ -350,12 +350,15 @@ public class OopProgramParser {
 				boolean zapped = oopChar == '\'';
 				String s = readLineToEnd();
 				OopCommand cmd = null;
+				boolean restoreFindStringVisible = !s.endsWith(" ");
+				while (s.endsWith(" ")) {
+					s = s.substring(0, s.length() - 1);
+				}
 				if (WORD_PATTERN.matcher(s).find() && !s.startsWith(":")) {
-					boolean restoreFindStringVisible = false;
 					int lastPosition = position;
 					readChar();
 					oopChar = upCase(oopChar);
-					restoreFindStringVisible = !((oopChar >= 'A' && oopChar <= 'Z') || (oopChar == '_'));
+					restoreFindStringVisible &= !((oopChar >= 'A' && oopChar <= 'Z') || (oopChar == '_'));
 					position = lastPosition;
 					cmd = new OopCommandLabel(s, zapped, restoreFindStringVisible);
 				} else if (zapped) {
