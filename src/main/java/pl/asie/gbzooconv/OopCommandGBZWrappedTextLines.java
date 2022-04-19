@@ -34,6 +34,7 @@ public class OopCommandGBZWrappedTextLines extends OopCommand {
 				lineBuffer.add(line);
 				addLineBuffer(lineBuffer, wordWrapWidth);
 				lineBuffer.clear();
+				continue;
 			}
 
 			boolean lineCompatible = false;
@@ -57,7 +58,7 @@ public class OopCommandGBZWrappedTextLines extends OopCommand {
 		}
 
 		/* for (OopCommandTextLine line : lines) {
-			System.out.println("appending '" + line.getMessage() + "'");
+			System.out.println(Objects.hashCode(this) + " appending '" + line.getMessage() + "'");
 		} */
 	}
 
@@ -95,12 +96,12 @@ public class OopCommandGBZWrappedTextLines extends OopCommand {
 	}
 
 	private OopCommandTextLine createTextLine(OopCommandTextLine.Type type, OopLabelTarget destination, String externalDestination, String s, int wordWrapWidth) {
-		if (type == OopCommandTextLine.Type.CENTERED) {
+		/* if (type == OopCommandTextLine.Type.CENTERED) {
 			int offset = (wordWrapWidth - s.length()) / 2;
 			if (offset > 0) {
 				s = " ".repeat(offset) + s;
 			}
-		}
+		} */
 		return new OopCommandTextLine(type, destination, externalDestination, s);
 	}
 }

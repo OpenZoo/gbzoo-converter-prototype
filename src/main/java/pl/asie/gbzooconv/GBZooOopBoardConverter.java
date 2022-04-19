@@ -2,7 +2,6 @@ package pl.asie.gbzooconv;
 
 import lombok.AccessLevel;
 import lombok.Getter;
-import pl.asie.libzzt.Platform;
 import pl.asie.libzzt.oop.OopLabelTarget;
 import pl.asie.libzzt.oop.OopProgram;
 import pl.asie.libzzt.oop.OopSound;
@@ -71,8 +70,8 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 @Getter
 public class GBZooOopBoardConverter {
@@ -167,7 +166,7 @@ public class GBZooOopBoardConverter {
 			names.add(program.getName());
 		}
 
-		OopUtils.allChildren(program.getCommands().stream()).flatMap(c -> c.getLabels().stream()).map(OopUtils::stripChars)
+		OopUtils.allChildren(program.getCommands().stream()).flatMap(c -> c.getLabels().stream()).map(OopUtils::asToken)
 				.filter(label -> !SPECIAL_LABELS.containsKey(label) && !labels.contains(label)).forEach(labels::add);
 	}
 
@@ -419,7 +418,7 @@ public class GBZooOopBoardConverter {
 					try {
 						targetId = indexOfOrThrow(this.names, SPECIAL_NAMES, line.getDestination().getTarget().toUpperCase(Locale.ROOT));
 					} catch (Exception e) {
-						warnOrError("text line: " + e.getMessage());
+						warnOrError("T " + e.getMessage());
 					}
 					try {
 						labelId = indexOfOrThrow(this.labels, SPECIAL_LABELS, line.getDestination().getLabel().toUpperCase(Locale.ROOT));
@@ -436,6 +435,28 @@ public class GBZooOopBoardConverter {
 		} else {
 			throw new RuntimeException("Unsupported command: " + command);
 		}
+	}
+
+	private boolean isNonEmptyText(OopCommand cmd) {
+		return cmd instanceof OopCommandTextLine && !((OopCommandTextLine) cmd).getMessage().isEmpty();
+	}
+
+	private boolean isMergeableWith(OopCommandTextLine a, OopCommandTextLine b) {
+		if (a.getType() != b.getType()) {
+			return false;
+		}
+		if (a.getType() == OopCommandTextLine.Type.HYPERLINK) {
+			if (!Objects.equals(a.getDestination(), b.getDestination())) {
+				return false;
+			}
+			return false; // TODO: Cyber Purge needs this, but other programs might not like it
+		} else if (a.getType() == OopCommandTextLine.Type.EXTERNAL_HYPERLINK) {
+			if (!Objects.equals(a.getExternalDestination(), b.getExternalDestination())) {
+				return false;
+			}
+			return false; // TODO: Cyber Purge needs this, but other programs might not like it
+		}
+		return true;
 	}
 
 	public byte[] serializeProgram(OopProgram program) {
@@ -462,7 +483,17 @@ public class GBZooOopBoardConverter {
 				}
 			}
 
-			if (cmd instanceof OopCommandTextLine tl) {
+			if (isNonEmptyText(cmd) && cmd instanceof OopCommandTextLine tl) {
+				if (!textLines.isEmpty()) {
+					OopCommandTextLine prev = textLines.get(0);
+					if (!isMergeableWith(tl, prev)) {
+						commands.add(new OopCommandGBZWrappedTextLines(textLines, WORD_WRAP_WIDTH));
+						if (prev.getType() == OopCommandTextLine.Type.HYPERLINK) {
+							System.out.println(textLines);
+						}
+						textLines.clear();
+					}
+				}
 				if (tl.getType() != OopCommandTextLine.Type.EXTERNAL_HYPERLINK) {
 					textLines.add(tl);
 				} else {
@@ -473,7 +504,11 @@ public class GBZooOopBoardConverter {
 					commands.add(new OopCommandGBZWrappedTextLines(textLines, WORD_WRAP_WIDTH));
 					textLines.clear();
 				}
-				commands.add(cmd);
+				if (cmd instanceof OopCommandTextLine tl) {
+					commands.add(new OopCommandGBZWrappedTextLines(List.of(tl), WORD_WRAP_WIDTH));
+				} else {
+					commands.add(cmd);
+				}
 			}
 		}
 		if (!textLines.isEmpty()) {
@@ -503,7 +538,7 @@ public class GBZooOopBoardConverter {
 		}
 		this.worldState.setMaxLinesInProgram(linesInProgram);
 
-		List<Integer> fullData = new ArrayList<>();
+		List<Integer> fullData= new ArrayList<>();
 		int idx = names.indexOf(program.getName());
 		fullData.add(idx >= 0 ? idx : 255);
 		int offsetToWindowName = 0;

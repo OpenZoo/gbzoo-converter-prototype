@@ -251,11 +251,12 @@ public class OopProgramParser {
 		} else if ("THROWSTAR".equals(oopWord)) {
 			return new OopCommandThrowstar(parseDirection());
 		} else if ("GIVE".equals(oopWord) || "TAKE".equals(oopWord)) {
+			String cmdName = oopWord;
 			readWord();
 			try {
 				OopCounterType type = OopCounterType.valueOf(oopWord);
 				readValue();
-				if ("TAKE".equals(oopWord)) {
+				if ("TAKE".equals(cmdName)) {
 					return new OopCommandGive(type, -oopValue, readCommand());
 				} else {
 					return new OopCommandGive(type, oopValue, readCommand());
