@@ -168,6 +168,7 @@ public class GBZooOopBoardConverter {
 
 		OopUtils.allChildren(program.getCommands().stream()).flatMap(c -> c.getLabels().stream()).map(OopUtils::asToken)
 				.filter(label -> !SPECIAL_LABELS.containsKey(label) && !labels.contains(label)).forEach(labels::add);
+		// System.out.println(program);
 	}
 
 	private void serializeTile(OopTile tile, List<Integer> code) {

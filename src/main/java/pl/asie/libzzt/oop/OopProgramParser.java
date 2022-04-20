@@ -1,5 +1,6 @@
 package pl.asie.libzzt.oop;
 
+import pl.asie.libzzt.Element;
 import pl.asie.libzzt.Platform;
 import pl.asie.libzzt.oop.commands.OopCommand;
 import pl.asie.libzzt.oop.commands.OopCommandBecome;
@@ -167,7 +168,11 @@ public class OopProgramParser {
 			readWord();
 		}
 
-		return new OopTile(Platform.ZZT.getLibrary().byInternalName(oopWord), color);
+		Element element = Platform.ZZT.getLibrary().byOopTokenName(oopWord);
+		if (element == null) {
+			throw new OopParseException(this, "Bad object kind");
+		}
+		return new OopTile(element, color);
 	}
 
 	private OopCondition parseCondition() throws OopParseException {
