@@ -170,7 +170,7 @@ public class OopProgramParser {
 
 		Element element = Platform.ZZT.getLibrary().byOopTokenName(oopWord);
 		if (element == null) {
-			throw new OopParseException(this, "Bad object kind");
+			throw new OopParseException(this, "Bad object kind: " + oopWord);
 		}
 		return new OopTile(element, color);
 	}
