@@ -50,6 +50,9 @@ import pl.asie.libzzt.oop.directions.OopDirectionFlow;
 import pl.asie.libzzt.oop.directions.OopDirectionIdle;
 import pl.asie.libzzt.oop.directions.OopDirectionNorth;
 import pl.asie.libzzt.oop.directions.OopDirectionOpp;
+import pl.asie.libzzt.oop.directions.OopDirectionRnd;
+import pl.asie.libzzt.oop.directions.OopDirectionRndne;
+import pl.asie.libzzt.oop.directions.OopDirectionRndns;
 import pl.asie.libzzt.oop.directions.OopDirectionRndp;
 import pl.asie.libzzt.oop.directions.OopDirectionSeek;
 import pl.asie.libzzt.oop.directions.OopDirectionSouth;
@@ -211,11 +214,11 @@ public class OopProgramParser {
 		} else if ("FLOW".equals(oopWord)) {
 			return new OopDirectionFlow();
 		} else if ("RND".equals(oopWord)) {
-			return new OopDirectionFlow();
+			return new OopDirectionRnd();
 		} else if ("RNDNS".equals(oopWord)) {
-			return new OopDirectionFlow();
+			return new OopDirectionRndns();
 		} else if ("RNDNE".equals(oopWord)) {
-			return new OopDirectionFlow();
+			return new OopDirectionRndne();
 		} else if ("CW".equals(oopWord)) {
 			return new OopDirectionCw(parseDirection());
 		} else if ("CCW".equals(oopWord)) {
