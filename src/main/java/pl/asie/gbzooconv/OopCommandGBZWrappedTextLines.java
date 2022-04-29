@@ -9,6 +9,7 @@ import pl.asie.libzzt.oop.commands.OopCommandTextLine;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Objects;
 import java.util.stream.Collectors;
 
@@ -79,13 +80,13 @@ public class OopCommandGBZWrappedTextLines extends OopCommand {
 			lines.add(createTextLine(currLine.getType(), currLine.getDestination(), currLine.getExternalDestination(), "", wordWrapWidth));
 		} else {
 			try {
-				for (String s : WordWrap.from(fullText).maxWidth(wordWrapWidth).wrapToList()) {
+				for (String s : wrap(fullText, wordWrapWidth)) {
 					lines.add(createTextLine(currLine.getType(), currLine.getDestination(), currLine.getExternalDestination(), s, wordWrapWidth));
 				}
 			} catch (IllegalArgumentException e) {
 				fullText = buffer.stream().map(OopCommandTextLine::getMessage).map(String::strip).collect(Collectors.joining(" "));
 				try {
-					for (String s : WordWrap.from(fullText).maxWidth(wordWrapWidth).wrapToList()) {
+					for (String s : wrap(fullText, wordWrapWidth)) {
 						lines.add(createTextLine(currLine.getType(), currLine.getDestination(), currLine.getExternalDestination(), s, wordWrapWidth));
 					}
 				} catch (IllegalArgumentException ee) {
@@ -95,6 +96,25 @@ public class OopCommandGBZWrappedTextLines extends OopCommand {
 		}
 	}
 
+	private List<String> wrap(String fullText, int wordWrapWidth) {
+		List<String> list = new ArrayList<>(WordWrap.from(fullText).maxWidth(wordWrapWidth).wrapToList());
+		for (int i = 0; i < list.size(); i++) {
+			String s = list.get(i);
+			if (s.length() > wordWrapWidth) {
+				String rest = String.join(" ", list.subList(i + 1, list.size()));
+				while (list.size() > i) {
+					list.remove(i);
+				}
+				while (s.length() > wordWrapWidth) {
+					list.add(s.substring(0, wordWrapWidth));
+					s = s.substring(wordWrapWidth);
+				}
+				list.addAll(WordWrap.from(s + " " + rest).maxWidth(wordWrapWidth).wrapToList());
+			}
+		}
+		return list;
+	}
+
 	private OopCommandTextLine createTextLine(OopCommandTextLine.Type type, OopLabelTarget destination, String externalDestination, String s, int wordWrapWidth) {
 		/* if (type == OopCommandTextLine.Type.CENTERED) {
 			int offset = (wordWrapWidth - s.length()) / 2;
@@ -102,6 +122,9 @@ public class OopCommandGBZWrappedTextLines extends OopCommand {
 				s = " ".repeat(offset) + s;
 			}
 		} */
+		if (s.length() > wordWrapWidth) {
+			throw new RuntimeException("Line too long: " + s.length() + " > " + wordWrapWidth);
+		}
 		return new OopCommandTextLine(type, destination, externalDestination, s);
 	}
 }

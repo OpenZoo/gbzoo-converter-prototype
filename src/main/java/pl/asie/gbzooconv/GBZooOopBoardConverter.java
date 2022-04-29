@@ -2,6 +2,7 @@ package pl.asie.gbzooconv;
 
 import lombok.AccessLevel;
 import lombok.Getter;
+import pl.asie.libzzt.Board;
 import pl.asie.libzzt.oop.OopLabelTarget;
 import pl.asie.libzzt.oop.OopProgram;
 import pl.asie.libzzt.oop.OopSound;
@@ -92,7 +93,7 @@ public class GBZooOopBoardConverter {
 	private static final int MAX_LABELS = 255 - SPECIAL_LABELS.size();
 	private static final int MAX_NAMES = 255 - SPECIAL_NAMES.size();
 	private static final int CODE_OFFSET = 5;
-	private static final int WORD_WRAP_WIDTH = 18;
+	private static final int WORD_WRAP_WIDTH = 19;
 
 	private final GBZooOopWorldState worldState;
 	private final Set<OopProgram> programs = new HashSet<>();
@@ -102,6 +103,7 @@ public class GBZooOopBoardConverter {
 	private final Map<OopProgram, Map<Integer, Integer>> programPositionMap = new HashMap<>();
 	private final BankPacker packer;
 	private final boolean failFast;
+	private String location;
 
 	public GBZooOopBoardConverter(GBZooOopWorldState worldState, BankPacker packer, boolean failFast) {
 		this.worldState = worldState;
@@ -113,7 +115,7 @@ public class GBZooOopBoardConverter {
 		if (failFast) {
 			throw new RuntimeException(s);
 		} else {
-			System.err.println("WARNING: " + s);
+			System.err.println("WARNING: " + s + " [at " + (location != null ? location : null) + "]");
 		}
 	}
 
@@ -168,7 +170,7 @@ public class GBZooOopBoardConverter {
 
 		OopUtils.allChildren(program.getCommands().stream()).flatMap(c -> c.getLabels().stream()).map(OopUtils::asToken)
 				.filter(label -> !SPECIAL_LABELS.containsKey(label) && !labels.contains(label)).forEach(labels::add);
-		// System.out.println(program);
+		System.out.println(program);
 	}
 
 	private void serializeTile(OopTile tile, List<Integer> code) {
@@ -460,7 +462,8 @@ public class GBZooOopBoardConverter {
 		return true;
 	}
 
-	public byte[] serializeProgram(OopProgram program) {
+	public byte[] serializeProgram(String location, OopProgram program) {
+		this.location = location;
 		Map<Integer, Integer> positionMap = new HashMap<>();
 		List<Integer> code = new ArrayList<>();
 		List<Integer> labels = new ArrayList<>();
@@ -539,7 +542,7 @@ public class GBZooOopBoardConverter {
 		}
 		this.worldState.setMaxLinesInProgram(linesInProgram);
 
-		List<Integer> fullData= new ArrayList<>();
+		List<Integer> fullData = new ArrayList<>();
 		int idx = names.indexOf(program.getName());
 		fullData.add(idx >= 0 ? idx : 255);
 		int offsetToWindowName = 0;
@@ -584,6 +587,7 @@ public class GBZooOopBoardConverter {
 		}
 
 		programPositionMap.put(program, positionMap);
+		this.location = null;
 		return fullDataByte;
 	}
 

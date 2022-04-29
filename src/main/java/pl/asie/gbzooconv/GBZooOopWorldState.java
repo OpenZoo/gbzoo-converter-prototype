@@ -4,6 +4,7 @@ import lombok.Getter;
 import pl.asie.libzzt.Board;
 import pl.asie.libzzt.Stat;
 import pl.asie.libzzt.World;
+import pl.asie.libzzt.oop.OopParseException;
 import pl.asie.libzzt.oop.OopUtils;
 import pl.asie.libzzt.oop.commands.OopCommandTextLine;
 
@@ -29,10 +30,14 @@ public class GBZooOopWorldState {
 		for (Board b : world.getBoards()) {
 			for (Stat stat : b.getStats()) {
 				if (stat.getData() != null) {
-					OopUtils.allChildren(stat.getCode().getCommands().stream())
-							.flatMap(c -> c.getFlags().stream())
-							.filter(f -> !flags.contains(f))
-							.forEach(flags::add);
+					try {
+						OopUtils.allChildren(stat.getCode().getCommands().stream())
+								.flatMap(c -> c.getFlags().stream())
+								.filter(f -> !flags.contains(f))
+								.forEach(flags::add);
+					} catch (OopParseException e) {
+						throw new BoardParseException("OOP parse error, board " + world.getBoards().indexOf(b) + ", stat " + b.getStats().indexOf(stat), e);
+					}
 				}
 			}
 		}

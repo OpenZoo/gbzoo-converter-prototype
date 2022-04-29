@@ -56,7 +56,7 @@ public class GBZooConverter {
 		// write boards
 		for (int i = 0; i < world.getBoards().size(); i++) {
 			Board board = world.getBoards().get(i);
-			byte[] data = addBoard(board, oopWorldState);
+			byte[] data = addBoard(i, board, oopWorldState);
 			this.bankPacker.updatePointer(this.boardPointers, i * 3, data, true);
 		}
 
@@ -115,7 +115,7 @@ public class GBZooConverter {
 		}
 	}
 
-	private byte[] addBoard(Board board, GBZooOopWorldState oopWorldState) throws IOException {
+	private byte[] addBoard(int boardId, Board board, GBZooOopWorldState oopWorldState) throws IOException {
 		System.out.println("Saving board " + board.getName());
 
 		try (ByteArrayOutputStream byteStream = new ByteArrayOutputStream(); ZOutputStream stream = new ZOutputStream(byteStream, Platform.ZZT)) {
@@ -176,7 +176,15 @@ public class GBZooConverter {
 
 			Map<OopProgram, byte[]> programMap = new HashMap<>();
 			for (OopProgram program : oopConverter.getPrograms()) {
-				byte[] data = oopConverter.serializeProgram(program);
+				int statId = -1;
+				for (int i = 0; i < board.getStats().size(); i++) {
+					if (board.getStats().get(i).getCode() == program) {
+						statId = i;
+					}
+				}
+				byte[] data = oopConverter.serializeProgram("Board " + boardId
+						+ ", stat " + statId,
+						program);
 				this.bankPacker.add(List.of(data));
 				programMap.put(program, data);
 			}
