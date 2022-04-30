@@ -136,15 +136,15 @@ public class GBZooOopBoardConverter {
 		return programPositionMap.getOrDefault(program, Map.of());
 	}
 
-	private static <T> int indexOfOrThrow(List<T> list, T item) {
+	private <T> int indexOfOrThrow(List<T> list, T item) {
 		int idx = list.indexOf(item);
 		if (idx < 0) {
-			throw new RuntimeException(item + " not found in " + list);
+			throw new RuntimeException(item + " not found in " + list + " [at " + (location != null ? location : null) + "]");
 		}
 		return idx;
 	}
 
-	private static <T> int indexOfOrThrow(List<T> list, Map<T, Integer> specialMap, T item) {
+	private <T> int indexOfOrThrow(List<T> list, Map<T, Integer> specialMap, T item) {
 		//noinspection SuspiciousMethodCalls
 		if (item == null || ((item instanceof String) && ((String) item).isEmpty() && !specialMap.containsKey(""))) {
 			return 255;
@@ -154,7 +154,7 @@ public class GBZooOopBoardConverter {
 		}
 		int idx = list.indexOf(item);
 		if (idx < 0) {
-			throw new RuntimeException(item + " not found in " + list);
+			throw new RuntimeException(item + " not found in " + list + " [at " + (location != null ? location : null) + "]");
 		}
 		return idx;
 	}

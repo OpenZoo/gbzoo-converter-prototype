@@ -234,7 +234,7 @@ public class OopProgramParser {
 
 	private OopCommand readCommand() throws OopParseException {
 		readWord();
-		if ("THEN".equals(oopWord)) {
+		while ("THEN".equals(oopWord)) {
 			readWord();
 		}
 		if (oopWord.isEmpty()) {
