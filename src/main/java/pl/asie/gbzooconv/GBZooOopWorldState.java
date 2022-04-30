@@ -58,15 +58,18 @@ public class GBZooOopWorldState {
 
 		List<Integer> data = new ArrayList<>();
 		switch (line.getType()) {
-			case REGULAR -> { data.add(0); data.add(0); data.add(0); }
-			case CENTERED -> { data.add(1); data.add(0); data.add(0); }
-			case HYPERLINK -> { data.add(2); data.add(targetId); data.add(labelId); }
+			case REGULAR -> { data.add(0); }
+			case CENTERED -> { data.add(1); }
+			case HYPERLINK -> { data.add(2); }
 			default -> throw new RuntimeException("Unsupported type: " + line.getType());
 		}
 		byte[] lineText = line.getMessage().getBytes(StandardCharsets.ISO_8859_1);
 		data.add(lineText.length);
 		for (int i = 0; i < lineText.length; i++) {
 			data.add((int) lineText[i] & 0xFF);
+		}
+		switch (line.getType()) {
+			case HYPERLINK -> { data.add(targetId); data.add(labelId); }
 		}
 
 		dataArray = GBZooUtils.toByteArray(data);
